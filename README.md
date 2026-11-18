@@ -4,6 +4,15 @@
 
 Gaban Provos is a full-stack starter for one Linux VPS. Hermes receives a mission, creates and reviews a task plan, then delegates bounded automation to OpenClaw. The dashboard and API expose task state; agents are never exposed directly to the public internet.
 
+## Messaging: two bots, one coordinated team
+
+The system supports Telegram and Discord with separate bot accounts for each runtime:
+
+- **Gaban Hermes** is the owner-facing lead: mission intake, planning, approval requests, delegation, and final report.
+- **Gaban Worker** is the OpenClaw automation worker: it handles only approved, bounded tasks and sends evidence back to Hermes.
+
+They collaborate through the internal control-plane queue, not by trusting one another's ordinary chat messages. See [the Telegram and Discord setup guide](docs/MESSAGING.md) for account creation, recommended channel layout, allowlists, and security rules.
+
 ## Architecture
 
 ```text
