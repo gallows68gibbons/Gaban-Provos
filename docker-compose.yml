@@ -1,0 +1,103 @@
+name: gaban-provos
+
+services:
+  dashboard:
+    image: caddy:2-alpine
+    depends_on:
+      api:
+        condition: service_started
+    ports:
+      - "${DASHBOARD_BIND:-127.0.0.1:8080}:80"
+    volumes:
+      - ./apps/web:/srv:ro
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+    networks: [edge, control]
+    read_only: true
+    tmpfs: [/config, /data, /tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    restart: unless-stopped
+
+  api:
+    build: ./apps/api
+    environment:
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-gaban}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-gaban}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks: [control]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gaban}
+      POSTGRES_USER: ${POSTGRES_USER:-gaban}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    networks: [control]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: [redis-server, --appendonly, 'yes']
+    volumes: [redis-data:/data]
+    networks: [control]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    restart: unless-stopped
+
+  # Official images are internal-only. Complete each product's official onboarding
+  # inside its container before assigning any real credentials or external tools.
+  hermes:
+    image: nousresearch/hermes-agent:latest
+    profiles: [agents]
+    volumes:
+      - hermes-config:/home/hermes/.hermes
+      - hermes-workspace:/workspace
+    networks: [control]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    restart: unless-stopped
+
+  openclaw:
+    image: ghcr.io/openclaw/openclaw:latest
+    profiles: [agents]
+    volumes:
+      - openclaw-config:/home/node/.openclaw
+      - openclaw-workspace:/workspace
+    networks: [control]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    restart: unless-stopped
+
+networks:
+  edge: {}
+  control:
+    internal: true
+
+volumes:
+  postgres-data: {}
+  redis-data: {}
+  hermes-config: {}
+  hermes-workspace: {}
+  openclaw-config: {}
+  openclaw-workspace: {}
+
